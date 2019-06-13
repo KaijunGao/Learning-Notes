@@ -1,0 +1,63 @@
+1.卷积层参数量占比小，计算量占比大；全连接层参数量占比大，计算量占比小。
+因此在进行计算加速优化时，重点放在卷基层；在进行参数优化、权值裁剪时，重点放在全连接层。
+
+2.数据变换器
+transform_param:
+optional float scale (default=1) 像素幅度缩放参数
+optional bool mirror (default=false) 图像随机镜像开关
+optional uint32 crop_size (default=0) 图像随机切块的大小
+optional string mean_file 存储图像均值的文件
+repeated float mean_value 均值数值，无需读取文件。若数目与图像通道数目相等，则每个图像通道分别减去对应的均值；
+                          如果只给出一个值，则每个图像通道都减去同一个均值
+optional bool force_color (default=false) 强制为三通道彩色图像输入
+optional bool force_gray (default=false) 强制为单通道灰度图像输入
+
+3.在ImageNet-1000分类问题中，初始状态为均匀分布，每个类别的分类概率均为0.001，故此时计算损失函数值为-ln(0.001)=ln(1000)=6.9。
+为什么loss总是在6.9左右（该现象被称为6.9高原反应），训练了很久都不下降？说明还没有收敛的迹象，尝试调大学习速率，或者修改权值初始方式。
+
+4.solver相关的描述信息
+指定Net结构描述文件（*.prototxt）
+optional string net
+内置Net参数
+optional NetParameter net_param
+网络状态，可有一个训练网络和多个测试网络
+optional NetState train_state
+repeated NetState test_state
+测试阶段迭代次数
+repeated int32 test_iter
+相邻两个测试阶段的间隔（单位为迭代次数）
+optional int32 test_interval (default=0)
+测试时是否需要计算损失函数，默认不需要
+optional bool test_compute_loss (default=false)
+初始测试阶段，默认为真，表示在第一次迭代之前首先进行一次测试流程，保证内存可用，打印初始损失函数值
+optional bool test_initialization (default=false)
+学习速率，全局通用
+optional float base_lr
+每次打印信息的间隔
+optional int32 display
+显示最近一个迭代周期的损失函数平均值
+optional int32 average_loss (default=1)
+最大迭代次数
+optional int32 max_iter
+误差梯度在多少个批量数据上累计，默认为一个
+optional int32 iter_size (default=1)
+学习速率衰减策略：
+固定学习率fixed  步进衰减step  指数衰减exp  倒数衰减inv  多步衰减multistep  多项式衰减poly  sigmoid衰减sigmoid
+规整化类型，L1或L2
+optional string regularization_type (default="L2")
+求解器类型
+enum SolverType={SGD,NESTEROV,ADAGRAD,RMSPROP,ADADELTA,ADAM}
+optional SolverType solver_type (default=SGD)
+是否打印调试信息，默认不打印
+optional bool debug_info (default=false)
+训练结束时是否打印快照，默认打印
+optional bool snapshot_after_train (default=true)
+
+5.Caffe计时功能
+编译好的Caffe可以通过运行caffe time命令，对当前平台上网络各层前向/反向计算进行计时：
+./build/tools/caffe time \ -model examples/mnist/lenet_train_test.prototxt
+
+6.特征图可视化
+使用可视化可以很容易看出危险的错误信号，比如对于多个不同的输入，一些响应特征图全为零，这样可以检测“死”滤波器，可能是学习速率过高的症状。
+通过观察每层的响应特征图，我们可以判断模型的结构设计（如每层通道数目）是否合理，
+如果大量的响应特征图都重复出现或全为接近0的值，则可以减少通道数目以提高网络效率。
